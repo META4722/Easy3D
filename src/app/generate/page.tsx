@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,11 +52,21 @@ export default function GeneratePage() {
   const [taskId, setTaskId] = useState<string>('')
   const [taskStatus, setTaskStatus] = useState<string>('')
   const [taskProgress, setTaskProgress] = useState<number>(0)
+  const [pollCleanup, setPollCleanup] = useState<(() => void) | null>(null)
   const [parameters, setParameters] = useState<ModelParameters>({
     scale: 1.0,
     detail: 0.5,
     density: 0.7
   })
+
+  // 组件卸载时清理轮询
+  useEffect(() => {
+    return () => {
+      if (pollCleanup) {
+        pollCleanup()
+      }
+    }
+  }, [pollCleanup])
 
   const uploadImageToTripo3D = async (file: File) => {
 
@@ -114,11 +124,37 @@ export default function GeneratePage() {
     maxFiles: 1
   })
 
-  // 轮询任务状态
+  // 轮询任务状态 - 优化版本
   const pollTaskStatus = async (taskId: string) => {
     console.log("开始轮询任务状态:", taskId)
+    
+    // 轮询配置
+    const POLL_CONFIG = {
+      maxAttempts: 199,        // 最大轮询次数 (120次 * 3秒 = 6分钟)
+      pollInterval: 3000,      // 轮询间隔 (3秒)
+      errorRetryInterval: 5000, // 错误重试间隔 (5秒)
+      maxErrorRetries: 5,      // 最大错误重试次数
+      stuckTimeout: 180000     // 卡住超时时间 (3分钟)
+    }
+
+    let pollCount = 0
+    let errorCount = 0
+    let lastStatus = ''
+    let lastStatusTime = Date.now()
+    let pollTimeoutId: NodeJS.Timeout | null = null
 
     const poll = async () => {
+      pollCount++
+      console.log(`轮询第 ${pollCount} 次，任务ID: ${taskId}`)
+
+      // 检查是否超过最大轮询次数
+      if (pollCount > POLL_CONFIG.maxAttempts) {
+        console.log("轮询次数超限，停止轮询")
+        setIsGenerating(false)
+        setError('任务处理超时，请重试或联系客服')
+        return
+      }
+
       try {
         const response = await fetch(`/api/task-status?taskId=${taskId}`)
 
@@ -127,10 +163,27 @@ export default function GeneratePage() {
         }
 
         const result = await response.json()
-        console.log("任务状态:", result)
+        console.log(`任务状态 (第${pollCount}次):`, result)
 
         if (result.success) {
           const { status, progress, model } = result.data
+          const currentTime = Date.now()
+
+          // 检查状态是否发生变化
+          if (status !== lastStatus) {
+            lastStatus = status
+            lastStatusTime = currentTime
+            console.log(`状态变化: ${status}`)
+          } else {
+            // 检查是否在同一状态卡太久
+            const stuckTime = currentTime - lastStatusTime
+            if (stuckTime > POLL_CONFIG.stuckTimeout) {
+              console.log(`任务在 ${status} 状态卡住超过 ${POLL_CONFIG.stuckTimeout/1000} 秒`)
+              setIsGenerating(false)
+              setError(`任务处理异常：在 ${status} 状态停留过久，请重试`)
+              return
+            }
+          }
 
           setTaskStatus(status)
           setTaskProgress(progress || 0)
@@ -138,10 +191,10 @@ export default function GeneratePage() {
           // 根据状态更新UI
           switch (status) {
             case 'queued':
-              console.log("任务排队中...")
+              console.log(`任务排队中... (${pollCount}/${POLL_CONFIG.maxAttempts})`)
               break
             case 'running':
-              console.log(`任务进行中... ${progress}%`)
+              console.log(`任务进行中... ${progress}% (${pollCount}/${POLL_CONFIG.maxAttempts})`)
               break
             case 'success':
               console.log("任务完成!")
@@ -155,34 +208,65 @@ export default function GeneratePage() {
                 progress: 100,
                 demo: result.demo
               })
+              if (pollTimeoutId) clearTimeout(pollTimeoutId)
               return // 停止轮询
             case 'failed':
             case 'cancelled':
               console.log("任务失败或被取消")
               setIsGenerating(false)
               setError(`任务${status === 'failed' ? '失败' : '被取消'}`)
+              if (pollTimeoutId) clearTimeout(pollTimeoutId)
               return // 停止轮询
           }
 
+          // 重置错误计数
+          errorCount = 0
+
           // 如果任务还在进行中，继续轮询
           if (status === 'queued' || status === 'running') {
-            setTimeout(poll, 3000) // 3秒后再次查询
+            pollTimeoutId = setTimeout(poll, POLL_CONFIG.pollInterval)
           }
         }
       } catch (err) {
-        console.error('轮询任务状态失败:', err)
-        setTimeout(poll, 5000) // 出错后5秒重试
+        errorCount++
+        console.error(`轮询任务状态失败 (第${errorCount}次错误):`, err)
+
+        // 检查是否超过最大错误重试次数
+        if (errorCount > POLL_CONFIG.maxErrorRetries) {
+          console.log("错误重试次数超限，停止轮询")
+          setIsGenerating(false)
+          setError('网络连接异常，请检查网络后重试')
+          return
+        }
+
+        // 错误重试
+        console.log(`${POLL_CONFIG.errorRetryInterval/1000}秒后重试...`)
+        pollTimeoutId = setTimeout(poll, POLL_CONFIG.errorRetryInterval)
       }
     }
 
     // 开始轮询
     poll()
+
+    // 返回清理函数，用于取消轮询
+    return () => {
+      if (pollTimeoutId) {
+        clearTimeout(pollTimeoutId)
+        console.log("轮询已取消")
+      }
+    }
   }
 
   const handleGenerate = async () => {
     if (!prompt.trim() && !imageToken) {
       setError('请输入描述文本或上传图片')
       return
+    }
+
+    // 如果有正在进行的轮询，先清理
+    if (pollCleanup) {
+      pollCleanup()
+      setPollCleanup(null)
     }
 
     setIsGenerating(true)
@@ -217,8 +301,9 @@ export default function GeneratePage() {
         setTaskId(newTaskId)
         setTaskStatus('queued')
 
-        // 开始轮询任务状态
-        pollTaskStatus(newTaskId)
+        // 开始轮询任务状态，并保存清理函数
+        const cleanup = await pollTaskStatus(newTaskId)
+        setPollCleanup(() => cleanup)
       } else {
         // 如果是演示模式，直接设置结果
         if (result.demo) {
@@ -244,6 +329,18 @@ export default function GeneratePage() {
       ...prev,
       [param]: value
     }))
+  }
+
+  const handleCancelGeneration = () => {
+    if (pollCleanup) {
+      pollCleanup()
+      setPollCleanup(null)
+    }
+    setIsGenerating(false)
+    setTaskStatus('')
+    setTaskProgress(0)
+    setError('生成已取消')
+    console.log("用户取消了模型生成")
   }
 
   const handleDownloadModel = async () => {

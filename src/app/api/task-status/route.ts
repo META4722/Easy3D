@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
           task_id: taskId,
           status: taskData.data.status,
           progress: taskData.data.progress || 0,
-          model: taskData.data.model || null,
+          model: taskData.data.output.pbr_model || null,
           created_time: taskData.data.created_time,
           finished_time: taskData.data.finished_time
         }
