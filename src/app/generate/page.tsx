@@ -22,6 +22,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
+import { log } from 'console'
 
 interface GeneratedModel {
   id: string
@@ -53,12 +54,6 @@ export default function GeneratePage() {
   })
 
   const uploadImageToTripo3D = async (file: File) => {
-    console.log("=== 开始上传图片到 Tripo3D ===")
-    console.log("文件信息:", {
-      name: file.name,
-      size: file.size,
-      type: file.type
-    })
 
     setIsUploading(true)
     setError('')
@@ -67,19 +62,12 @@ export default function GeneratePage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      console.log("准备调用 /api/upload-image")
-
       const response = await fetch('/api/upload-image', {
         method: 'POST',
         body: formData,
       })
 
-      console.log("API 响应状态:", response.status)
-      console.log("API 响应对象:", response)
-
-      if (!response.ok) {
-        throw new Error(`上传失败: ${response.statusText}`)
-      }
+     
 
       const result = await response.json()
 
@@ -89,7 +77,6 @@ export default function GeneratePage() {
 
       // 设置图片token和预览
       setImageToken(result.data.image_token)
-      console.log(result) //debug can delete
 
       setUploadedImage(file)
 

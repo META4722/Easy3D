@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
-
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
       const tripo3dResponse = await fetch('https://api.tripo3d.ai/v2/openapi/upload/sts', {
         method: 'POST',
         headers: {
-          // 注意：不要手动设置 Content-Type，让浏览器自动设置 multipart/form-data 的边界
+          // 不要手动设置 Content-Type！让浏览器自动设置 multipart/form-data 和 boundary
           'Authorization': `Bearer ${process.env.TRIPO3D_API_KEY}`,
         },
         body: uploadFormData,
