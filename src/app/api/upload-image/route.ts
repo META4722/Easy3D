@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
-  console.log("=== 进入 upload-image API POST 方法 ===")
-  console.log("请求 URL:", request.url)
-  console.log("请求方法:", request.method)
-  console.log("formData", request.formData)
 
   try {
     const formData = await request.formData()
@@ -36,14 +32,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 准备上传到 Tripo3D - 按照官方文档格式
-    console.log("准备上传文件到 Tripo3D API")
-    console.log("文件信息:", {
-      name: file.name,
-      size: file.size,
-      type: file.type
-    })
-
     // 将 File 转换为 ArrayBuffer，然后创建 Blob
     const buffer = await file.arrayBuffer()
     const blob = new Blob([buffer], { type: file.type })
@@ -52,7 +40,6 @@ export async function POST(request: NextRequest) {
     uploadFormData.append('file', blob, file.name)
 
     try {
-      console.log("调用 Tripo3D API...")
       const tripo3dResponse = await fetch('https://api.tripo3d.ai/v2/openapi/upload/sts', {
         method: 'POST',
         headers: {
@@ -67,7 +54,6 @@ export async function POST(request: NextRequest) {
       }
 
       const tripo3dData = await tripo3dResponse.json()
-      console.log("Tripo3D API 响应:", tripo3dData)
 
       if (tripo3dData.code !== 0) {
         throw new Error(`Tripo3D API error: ${tripo3dData.message || 'Unknown error'}`)
