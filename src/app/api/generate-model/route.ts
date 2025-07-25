@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 临时跳过数据库操作，直接测试 Tripo3D API
-    console.log("准备调用 Tripo3D API...")
 
     try {
       // 构建请求数据 - 根据是否有 imageToken 决定类型
@@ -30,8 +29,6 @@ export async function POST(request: NextRequest) {
         prompt: prompt
       }
 
-      console.log("请求数据:", requestData)
-
       const tripo3dResponse = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
         method: 'POST',
         headers: {
@@ -41,18 +38,12 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(requestData)
       })
 
-      console.log("Tripo3D API 响应状态:", tripo3dResponse.status)
-      console.log("Tripo3D API 响应头:", Object.fromEntries(tripo3dResponse.headers.entries()))
-
       if (!tripo3dResponse.ok) {
         const errorText = await tripo3dResponse.text()
-        console.log("Tripo3D API 错误响应:", errorText)
         throw new Error(`Tripo3D API error! status: ${tripo3dResponse.status}, response: ${errorText}`)
       }
 
       const tripo3dData = await tripo3dResponse.json()
-      console.log("Tripo3D API 响应数据:", tripo3dData)
-
       // 检查 Tripo3D API 响应
       if (tripo3dData.code !== 0) {
         throw new Error(`Tripo3D API error: ${tripo3dData.message || 'Unknown error'}`)
