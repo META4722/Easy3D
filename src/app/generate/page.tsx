@@ -30,6 +30,8 @@ interface GeneratedModel {
   preview_url?: string
   status: string
   demo?: boolean
+  task_id?: string
+  progress?: number
 }
 
 interface ModelParameters {
@@ -47,6 +49,9 @@ export default function GeneratePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedModel, setGeneratedModel] = useState<GeneratedModel | null>(null)
   const [error, setError] = useState<string>('')
+  const [taskId, setTaskId] = useState<string>('')
+  const [taskStatus, setTaskStatus] = useState<string>('')
+  const [taskProgress, setTaskProgress] = useState<number>(0)
   const [parameters, setParameters] = useState<ModelParameters>({
     scale: 1.0,
     detail: 0.5,
@@ -67,7 +72,7 @@ export default function GeneratePage() {
         body: formData,
       })
 
-     
+
 
       const result = await response.json()
 
@@ -109,6 +114,71 @@ export default function GeneratePage() {
     maxFiles: 1
   })
 
+  // 轮询任务状态
+  const pollTaskStatus = async (taskId: string) => {
+    console.log("开始轮询任务状态:", taskId)
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/task-status?taskId=${taskId}`)
+
+        if (!response.ok) {
+          throw new Error('获取任务状态失败')
+        }
+
+        const result = await response.json()
+        console.log("任务状态:", result)
+
+        if (result.success) {
+          const { status, progress, model } = result.data
+
+          setTaskStatus(status)
+          setTaskProgress(progress || 0)
+
+          // 根据状态更新UI
+          switch (status) {
+            case 'queued':
+              console.log("任务排队中...")
+              break
+            case 'running':
+              console.log(`任务进行中... ${progress}%`)
+              break
+            case 'success':
+              console.log("任务完成!")
+              setIsGenerating(false)
+              setGeneratedModel({
+                id: taskId,
+                file_url: model?.model_url || '',
+                preview_url: model?.preview_url || '',
+                status: 'completed',
+                task_id: taskId,
+                progress: 100,
+                demo: result.demo
+              })
+              return // 停止轮询
+            case 'failed':
+            case 'cancelled':
+              console.log("任务失败或被取消")
+              setIsGenerating(false)
+              setError(`任务${status === 'failed' ? '失败' : '被取消'}`)
+              return // 停止轮询
+          }
+
+          // 如果任务还在进行中，继续轮询
+          if (status === 'queued' || status === 'running') {
+            setTimeout(poll, 3000) // 3秒后再次查询
+          }
+        }
+      } catch (err) {
+        console.error('轮询任务状态失败:', err)
+        setTimeout(poll, 5000) // 出错后5秒重试
+      }
+    }
+
+    // 开始轮询
+    poll()
+  }
+
   const handleGenerate = async () => {
     if (!prompt.trim() && !imageToken) {
       setError('请输入描述文本或上传图片')
@@ -118,6 +188,9 @@ export default function GeneratePage() {
     setIsGenerating(true)
     setError('')
     setGeneratedModel(null)
+    setTaskId('')
+    setTaskStatus('')
+    setTaskProgress(0)
 
     try {
       const response = await fetch('/api/generate-model', {
@@ -137,11 +210,31 @@ export default function GeneratePage() {
       }
 
       const result = await response.json()
-      setGeneratedModel(result)
+      console.log("生成结果:", result)
+
+      if (result.success && result.data?.task_id) {
+        const newTaskId = result.data.task_id
+        setTaskId(newTaskId)
+        setTaskStatus('queued')
+
+        // 开始轮询任务状态
+        pollTaskStatus(newTaskId)
+      } else {
+        // 如果是演示模式，直接设置结果
+        if (result.demo) {
+          setGeneratedModel({
+            id: result.data?.task_id || 'demo',
+            file_url: 'https://storage.googleapis.com/3d-model-samples/sample.glb',
+            preview_url: 'https://storage.googleapis.com/3d-model-samples/sample-preview.jpg',
+            status: 'completed',
+            demo: true
+          })
+          setIsGenerating(false)
+        }
+      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成失败，请重试')
-    } finally {
       setIsGenerating(false)
     }
   }
@@ -151,6 +244,28 @@ export default function GeneratePage() {
       ...prev,
       [param]: value
     }))
+  }
+
+  const handleDownloadModel = async () => {
+    if (!generatedModel?.file_url) return
+
+    try {
+      const filename = `model_${generatedModel.id}.glb`
+      const downloadUrl = `/api/download-model?url=${encodeURIComponent(generatedModel.file_url)}&filename=${filename}`
+
+      // 创建下载链接
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      console.log("开始下载模型:", filename)
+    } catch (err) {
+      console.error('下载失败:', err)
+      setError('模型下载失败，请重试')
+    }
   }
 
   const handleOrderPrint = () => {
@@ -394,7 +509,33 @@ export default function GeneratePage() {
                       <div className="text-center space-y-4">
                         <Loader2 className="h-12 w-12 animate-spin mx-auto" />
                         <p>AI正在生成你的3D模型...</p>
-                        <p className="text-sm">这通常需要8-10秒</p>
+                        {taskStatus && (
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              状态: {
+                                taskStatus === 'queued' ? '排队中' :
+                                  taskStatus === 'running' ? '生成中' :
+                                    taskStatus === 'success' ? '完成' :
+                                      taskStatus === 'failed' ? '失败' :
+                                        taskStatus === 'cancelled' ? '已取消' : taskStatus
+                              }
+                            </p>
+                            {taskProgress > 0 && (
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${taskProgress}%` }}
+                                />
+                              </div>
+                            )}
+                            <p className="text-xs text-gray-500">
+                              {taskProgress > 0 ? `${taskProgress}%` : '请耐心等待...'}
+                            </p>
+                          </div>
+                        )}
+                        {!taskStatus && (
+                          <p className="text-sm">这通常需要30-60秒</p>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center">
@@ -410,7 +551,12 @@ export default function GeneratePage() {
             {/* Action Buttons */}
             {generatedModel && (
               <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={handleDownloadModel}
+                  disabled={!generatedModel.file_url}
+                >
                   <Download className="h-4 w-4" />
                   下载模型
                 </Button>
