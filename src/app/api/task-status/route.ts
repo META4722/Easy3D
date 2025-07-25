@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
           status: taskData.data.status,
           progress: taskData.data.progress || 0,
           model: taskData.data.output.pbr_model || null,
+          preview: taskData.data.output.rendered_image || null,
           created_time: taskData.data.created_time,
           finished_time: taskData.data.finished_time
         }

@@ -69,6 +69,12 @@ export default function GeneratePage() {
   }, [pollCleanup])
 
   const uploadImageToTripo3D = async (file: File) => {
+    console.log("=== 开始上传图片到 Tripo3D ===")
+    console.log("文件信息:", {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    })
 
     setIsUploading(true)
     setError('')
@@ -77,14 +83,21 @@ export default function GeneratePage() {
       const formData = new FormData()
       formData.append('file', file)
 
+      console.log("准备调用 /api/upload-image")
+
       const response = await fetch('/api/upload-image', {
         method: 'POST',
         body: formData,
       })
 
+      console.log("API 响应状态:", response.status)
 
+      if (!response.ok) {
+        throw new Error(`上传失败: ${response.statusText}`)
+      }
 
       const result = await response.json()
+      console.log("上传结果:", result)
 
       if (!result.success) {
         throw new Error(result.error || '上传失败')
@@ -92,6 +105,7 @@ export default function GeneratePage() {
 
       // 设置图片token和预览
       setImageToken(result.data.image_token)
+      console.log("✅ 图片上传成功，获得 token:", result.data.image_token)
 
       setUploadedImage(file)
 
@@ -103,6 +117,7 @@ export default function GeneratePage() {
       reader.readAsDataURL(file)
 
     } catch (err) {
+      console.error("上传失败:", err)
       setError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
       setIsUploading(false)
@@ -127,7 +142,7 @@ export default function GeneratePage() {
   // 轮询任务状态 - 优化版本
   const pollTaskStatus = async (taskId: string) => {
     console.log("开始轮询任务状态:", taskId)
-    
+
     // 轮询配置
     const POLL_CONFIG = {
       maxAttempts: 199,        // 最大轮询次数 (120次 * 3秒 = 6分钟)
@@ -169,16 +184,24 @@ export default function GeneratePage() {
           const { status, progress, model } = result.data
           const currentTime = Date.now()
 
+          console.log("=== 轮询状态详情 ===")
+          console.log("状态:", status)
+          console.log("进度:", progress)
+          console.log("模型数据:", model)
+          console.log("完整数据:", JSON.stringify(result.data, null, 2))
+
           // 检查状态是否发生变化
           if (status !== lastStatus) {
             lastStatus = status
             lastStatusTime = currentTime
-            console.log(`状态变化: ${status}`)
+            console.log(`🔄 状态变化: ${lastStatus} → ${status}`)
           } else {
             // 检查是否在同一状态卡太久
             const stuckTime = currentTime - lastStatusTime
+            console.log(`⏱️ 在 ${status} 状态已停留 ${Math.round(stuckTime / 1000)} 秒`)
+
             if (stuckTime > POLL_CONFIG.stuckTimeout) {
-              console.log(`任务在 ${status} 状态卡住超过 ${POLL_CONFIG.stuckTimeout/1000} 秒`)
+              console.log(`⚠️ 任务在 ${status} 状态卡住超过 ${POLL_CONFIG.stuckTimeout / 1000} 秒`)
               setIsGenerating(false)
               setError(`任务处理异常：在 ${status} 状态停留过久，请重试`)
               return
@@ -191,32 +214,54 @@ export default function GeneratePage() {
           // 根据状态更新UI
           switch (status) {
             case 'queued':
-              console.log(`任务排队中... (${pollCount}/${POLL_CONFIG.maxAttempts})`)
+              console.log(`📋 任务排队中... (${pollCount}/${POLL_CONFIG.maxAttempts})`)
               break
             case 'running':
-              console.log(`任务进行中... ${progress}% (${pollCount}/${POLL_CONFIG.maxAttempts})`)
+              console.log(`🔄 任务进行中... ${progress}% (${pollCount}/${POLL_CONFIG.maxAttempts})`)
               break
             case 'success':
-              console.log("任务完成!")
+              console.log("🎉 任务完成!")
+              console.log("完整模型数据:", model)
+              console.log("模型URL:", model)
+              console.log("预览URL:", null)
+
               setIsGenerating(false)
+              // 使用代理URL来避免跨域问题
+              const proxyModelUrl = model
+                ? `/api/proxy-model?url=${encodeURIComponent(model)}`
+                : ''
+              // const proxyPreviewUrl = model?.preview_url
+              //   ? `/api/proxy-image?url=${encodeURIComponent(model.preview_url)}`
+              //   : ''
+
+              console.log("代理模型URL:", proxyModelUrl)
+              // console.log("代理预览URL:", proxyPreviewUrl)
+
               setGeneratedModel({
                 id: taskId,
-                file_url: model?.model_url || '',
-                preview_url: model?.preview_url || '',
+                file_url: proxyModelUrl,
+                // preview_url: proxyPreviewUrl,
                 status: 'completed',
                 task_id: taskId,
                 progress: 100,
                 demo: result.demo
               })
+
               if (pollTimeoutId) clearTimeout(pollTimeoutId)
+              console.log("✅ 轮询完成，模型已设置")
               return // 停止轮询
+
             case 'failed':
             case 'cancelled':
-              console.log("任务失败或被取消")
+              console.log(`❌ 任务${status === 'failed' ? '失败' : '被取消'}`)
               setIsGenerating(false)
               setError(`任务${status === 'failed' ? '失败' : '被取消'}`)
               if (pollTimeoutId) clearTimeout(pollTimeoutId)
               return // 停止轮询
+
+            default:
+              console.log(`❓ 未知状态: ${status}`)
+              break
           }
 
           // 重置错误计数
@@ -224,23 +269,30 @@ export default function GeneratePage() {
 
           // 如果任务还在进行中，继续轮询
           if (status === 'queued' || status === 'running') {
+            console.log(`⏰ ${POLL_CONFIG.pollInterval / 1000}秒后继续轮询...`)
             pollTimeoutId = setTimeout(poll, POLL_CONFIG.pollInterval)
+          } else {
+            console.log(`🛑 任务状态为 ${status}，停止轮询`)
           }
+        } else {
+          console.log("❌ API返回失败:", result)
+          throw new Error(result.error || '获取任务状态失败')
         }
+
       } catch (err) {
         errorCount++
-        console.error(`轮询任务状态失败 (第${errorCount}次错误):`, err)
+        console.error(`🚨 轮询任务状态失败 (第${errorCount}/${POLL_CONFIG.maxErrorRetries}次错误):`, err)
 
         // 检查是否超过最大错误重试次数
         if (errorCount > POLL_CONFIG.maxErrorRetries) {
-          console.log("错误重试次数超限，停止轮询")
+          console.log("💥 错误重试次数超限，停止轮询")
           setIsGenerating(false)
           setError('网络连接异常，请检查网络后重试')
           return
         }
 
         // 错误重试
-        console.log(`${POLL_CONFIG.errorRetryInterval/1000}秒后重试...`)
+        console.log(`🔄 ${POLL_CONFIG.errorRetryInterval / 1000}秒后重试... (剩余重试次数: ${POLL_CONFIG.maxErrorRetries - errorCount})`)
         pollTimeoutId = setTimeout(poll, POLL_CONFIG.errorRetryInterval)
       }
     }
@@ -294,28 +346,36 @@ export default function GeneratePage() {
       }
 
       const result = await response.json()
-      console.log("生成结果:", result)
+      console.log("=== 生成API响应 ===")
+      console.log("完整结果:", JSON.stringify(result, null, 2))
+      console.log("result.success:", result.success)
+      console.log("result.data:", result.data)
+      console.log("task_id:", result.data?.task_id)
 
       if (result.success && result.data?.task_id) {
         const newTaskId = result.data.task_id
+        console.log("✅ 获得任务ID，开始轮询:", newTaskId)
+
         setTaskId(newTaskId)
         setTaskStatus('queued')
 
         // 开始轮询任务状态，并保存清理函数
-        const cleanup = await pollTaskStatus(newTaskId)
+        const cleanup = pollTaskStatus(newTaskId)
         setPollCleanup(() => cleanup)
-      } else {
+      } else if (result.demo) {
         // 如果是演示模式，直接设置结果
-        if (result.demo) {
-          setGeneratedModel({
-            id: result.data?.task_id || 'demo',
-            file_url: 'https://storage.googleapis.com/3d-model-samples/sample.glb',
-            preview_url: 'https://storage.googleapis.com/3d-model-samples/sample-preview.jpg',
-            status: 'completed',
-            demo: true
-          })
-          setIsGenerating(false)
-        }
+        console.log("🎭 演示模式，直接设置模型结果")
+        setGeneratedModel({
+          id: result.data?.task_id || 'demo',
+          file_url: 'https://storage.googleapis.com/3d-model-samples/sample.glb',
+          preview_url: 'https://storage.googleapis.com/3d-model-samples/sample-preview.jpg',
+          status: 'completed',
+          demo: true
+        })
+        setIsGenerating(false)
+      } else {
+        console.log("❌ 未知的响应格式:", result)
+        throw new Error('服务器返回了未知的响应格式')
       }
 
     } catch (err) {
@@ -348,7 +408,17 @@ export default function GeneratePage() {
 
     try {
       const filename = `model_${generatedModel.id}.glb`
-      const downloadUrl = `/api/download-model?url=${encodeURIComponent(generatedModel.file_url)}&filename=${filename}`
+
+      // 如果是代理URL，需要提取原始URL
+      let downloadUrl = generatedModel.file_url
+      if (downloadUrl.startsWith('/api/proxy-model?url=')) {
+        // 从代理URL中提取原始URL
+        const urlParam = downloadUrl.split('url=')[1]
+        const originalUrl = decodeURIComponent(urlParam)
+        downloadUrl = `/api/download-model?url=${encodeURIComponent(originalUrl)}&filename=${filename}`
+      } else {
+        downloadUrl = `/api/download-model?url=${encodeURIComponent(downloadUrl)}&filename=${filename}`
+      }
 
       // 创建下载链接
       const link = document.createElement('a')
@@ -469,29 +539,55 @@ export default function GeneratePage() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || (!prompt.trim() && !imageToken)}
-                  className="w-full"
-                  size="lg"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      生成中...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-5 w-5" />
-                      开始生成 (约10秒)
-                    </>
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || (!prompt.trim() && !imageToken)}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        生成中...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-5 w-5" />
+                        开始生成 (约30-60秒)
+                      </>
+                    )}
+                  </Button>
+
+                  {/* 取消按钮 - 只在生成中显示 */}
+                  {isGenerating && (
+                    <Button
+                      onClick={handleCancelGeneration}
+                      variant="outline"
+                      className="w-full"
+                      size="sm"
+                    >
+                      取消生成
+                    </Button>
                   )}
-                </Button>
+                </div>
 
                 {error && (
                   <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg">
                     <AlertCircle className="h-4 w-4" />
                     <span className="text-sm">{error}</span>
+                  </div>
+                )}
+
+                {/* 调试信息面板 - 开发模式下显示 */}
+                {process.env.NODE_ENV === 'development' && (taskId || taskStatus) && (
+                  <div className="bg-gray-100 p-3 rounded-lg text-xs space-y-1">
+                    <div className="font-semibold text-gray-700">调试信息:</div>
+                    {taskId && <div>任务ID: {taskId}</div>}
+                    {taskStatus && <div>状态: {taskStatus}</div>}
+                    {taskProgress > 0 && <div>进度: {taskProgress}%</div>}
+                    <div>生成中: {isGenerating ? '是' : '否'}</div>
+                    <div>图片Token: {imageToken ? '已设置' : '未设置'}</div>
                   </div>
                 )}
               </CardContent>
