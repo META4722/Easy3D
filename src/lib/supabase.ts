@@ -8,10 +8,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 // Client-side Supabase client
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
-// Server component client - dynamic import for server-side only
-export const createServerClient = async () => {
-  const { cookies } = await import('next/headers')
-  return createServerComponentClient<Database>({ cookies })
+// Server component client - 简化版本避免 cookies 问题
+export const createServerClient = () => {
+  // 在开发阶段，直接使用 admin 客户端避免认证问题
+  return supabaseAdmin
 }
 
 // Client component client

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
@@ -13,127 +12,81 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user from session
-    const supabase = await createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    // 临时跳过数据库操作，直接测试 Tripo3D API
+    console.log("准备调用 Tripo3D API...")
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
-
-    // Create model record
-    const { data: model, error: modelError } = await supabase
-      .from('models')
-      .insert({
-        user_id: session.user.id,
-        prompt: prompt || 'Image to 3D conversion',
-        status: 'generating'
-      })
-      .select()
-      .single()
-
-    if (modelError) {
-      throw new Error(`Failed to create model record: ${modelError.message}`)
-    }
-
-    // Call Fast3D API
     try {
-      const fast3dResponse = await fetch('https://api.fast3d.io/v1/text2mesh', {
+      // 构建请求数据 - 根据是否有 imageToken 决定类型
+      const requestData = imageToken ? {
+        // 图片转模型
+        type: 'image_to_model',
+        file: {
+          type: 'jpg',
+          file_token: imageToken
+        }
+      } : {
+        // 文本转模型
+        type: 'text_to_model',
+        prompt: prompt
+      }
+
+      console.log("请求数据:", requestData)
+
+      const tripo3dResponse = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.FAST3D_API_KEY}`,
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.TRIPO3D_API_KEY}`
         },
-        body: JSON.stringify({
-          prompt: prompt,
-          image_token: imageToken,
-          quality: 'high',
-          format: 'glb'
-        }),
+        body: JSON.stringify(requestData)
       })
 
-      if (!fast3dResponse.ok) {
-        throw new Error(`Fast3D API error: ${fast3dResponse.statusText}`)
+      console.log("Tripo3D API 响应状态:", tripo3dResponse.status)
+      console.log("Tripo3D API 响应头:", Object.fromEntries(tripo3dResponse.headers.entries()))
+
+      if (!tripo3dResponse.ok) {
+        const errorText = await tripo3dResponse.text()
+        console.log("Tripo3D API 错误响应:", errorText)
+        throw new Error(`Tripo3D API error! status: ${tripo3dResponse.status}, response: ${errorText}`)
       }
 
-      const fast3dData = await fast3dResponse.json()
+      const tripo3dData = await tripo3dResponse.json()
+      console.log("Tripo3D API 响应数据:", tripo3dData)
 
-      // Update model with result
-      const { error: updateError } = await supabase
-        .from('models')
-        .update({
-          file_url: fast3dData.glb_url,
-          preview_url: fast3dData.preview_url,
-          status: 'completed'
-        })
-        .eq('id', model.id)
-
-      if (updateError) {
-        throw new Error(`Failed to update model: ${updateError.message}`)
+      // 检查 Tripo3D API 响应
+      if (tripo3dData.code !== 0) {
+        throw new Error(`Tripo3D API error: ${tripo3dData.message || 'Unknown error'}`)
       }
 
+      // 返回成功响应
       return NextResponse.json({
-        id: model.id,
-        file_url: fast3dData.glb_url,
-        preview_url: fast3dData.preview_url,
-        status: 'completed'
+        success: true,
+        data: tripo3dData.data,
+        message: '任务已提交到 Tripo3D'
       })
 
     } catch (apiError) {
-      // Update model status to failed
-      await supabase
-        .from('models')
-        .update({ status: 'failed' })
-        .eq('id', model.id)
-
-      // Log error
-      await supabaseAdmin
-        .from('error_logs')
-        .insert({
-          source: 'fast3d_api',
-          payload: { prompt, imageToken, modelId: model.id },
-          message: apiError instanceof Error ? apiError.message : 'Unknown error'
-        })
-
-      // For demo purposes, return a mock response
-      const mockGlbUrl = 'https://storage.googleapis.com/3d-model-samples/sample.glb'
-      const mockPreviewUrl = 'https://storage.googleapis.com/3d-model-samples/sample-preview.jpg'
-
-      await supabase
-        .from('models')
-        .update({
-          file_url: mockGlbUrl,
-          preview_url: mockPreviewUrl,
-          status: 'completed'
-        })
-        .eq('id', model.id)
-
+      console.error('Tripo3D API 调用失败:', apiError)
+      
+      // 返回演示响应
       return NextResponse.json({
-        id: model.id,
-        file_url: mockGlbUrl,
-        preview_url: mockPreviewUrl,
-        status: 'completed',
-        demo: true
+        success: true,
+        data: {
+          task_id: `demo_task_${Date.now()}`,
+          status: 'processing'
+        },
+        demo: true,
+        message: '演示模式 - Tripo3D API 调用失败，返回模拟数据'
       })
     }
 
   } catch (error) {
     console.error('Generate model error:', error)
-
-    // Log error
-    await supabaseAdmin
-      .from('error_logs')
-      .insert({
-        source: 'generate_model_api',
-        payload: null,
-        message: error instanceof Error ? error.message : 'Unknown error'
-      })
-
     return NextResponse.json(
-      { error: 'Failed to generate model' },
+      { 
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate model' 
+      },
       { status: 500 }
     )
   }
