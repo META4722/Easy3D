@@ -537,9 +537,11 @@ export default function GeneratePage() {
                     rows={4}
                     className="mt-2"
                   />
-                </div>  */}
+                </div> 
+                <div className="text-center text-gray-500">或者</div> 
+                */}
 
-                <div className="text-center text-gray-500">或者</div>
+                
 
                 <div>
                   <Label>上传参考图片</Label>
