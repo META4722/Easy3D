@@ -45,6 +45,7 @@ export default function GeneratePage() {
   const [uploadedImage, setUploadedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
   const [imageToken, setImageToken] = useState<string>('')
+  const [imageType, setImageType] = useState<string>('')
   const [isUploading, setIsUploading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedModel, setGeneratedModel] = useState<GeneratedModel | null>(null)
@@ -78,6 +79,10 @@ export default function GeneratePage() {
 
     setIsUploading(true)
     setError('')
+    // 清理之前的图片状态
+    setImageToken('')
+    setImageType('')
+    setImagePreview('')
 
     try {
       const formData = new FormData()
@@ -105,7 +110,9 @@ export default function GeneratePage() {
 
       // 设置图片token和预览
       setImageToken(result.data.image_token)
+      setImageType(result.data.image_type )
       console.log("✅ 图片上传成功，获得 token:", result.data.image_token)
+      console.log("图片类型:", result.data.image_type)
 
       setUploadedImage(file)
 
@@ -337,7 +344,7 @@ export default function GeneratePage() {
         body: JSON.stringify({
           prompt: prompt.trim(),
           imageToken: imageToken || null,
-          parameters
+          imageType: imageType || 'jpg'
         }),
       })
 
