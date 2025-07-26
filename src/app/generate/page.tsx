@@ -1,16 +1,29 @@
-'use client'
+"use client";
 
-import { useState, useCallback, useEffect } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Slider } from '@/components/ui/slider'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import ModelViewer from '@/components/ModelViewer'
+import { useState, useCallback, useEffect } from "react";
+import { useDropzone } from "react-dropzone";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import ModelViewer from "@/components/ModelViewer";
 import {
   Upload,
   Sparkles,
@@ -19,63 +32,69 @@ import {
   Download,
   ShoppingCart,
   Leaf,
-  AlertCircle
-} from 'lucide-react'
-import Link from 'next/link'
-import { log } from 'console'
+  AlertCircle,
+} from "lucide-react";
+import Link from "next/link";
+import { log } from "console";
 
 interface GeneratedModel {
-  id: string
-  file_url: string
-  preview_url?: string
-  status: string
-  demo?: boolean
-  task_id?: string
-  progress?: number
+  id: string;
+  file_url: string;
+  preview_url?: string;
+  status: string;
+  demo?: boolean;
+  task_id?: string;
+  progress?: number;
 }
 
 interface ModelParameters {
-  scale: number
-  detail: number
-  density: number
+  scale: number;
+  detail: number;
+  density: number;
 }
 
 export default function GeneratePage() {
-  const [prompt, setPrompt] = useState('')
-  const [uploadedImage, setUploadedImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string>('')
-  const [imageToken, setImageToken] = useState<string>('')
+
+  const [prompt, setPrompt] = useState("");
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [imageToken, setImageToken] = useState<string>("");
   const [imageType, setImageType] = useState<string>('')
-  const [isUploading, setIsUploading] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedModel, setGeneratedModel] = useState<GeneratedModel | null>(null)
-  const [error, setError] = useState<string>('')
-  const [taskId, setTaskId] = useState<string>('')
-  const [taskStatus, setTaskStatus] = useState<string>('')
-  const [taskProgress, setTaskProgress] = useState<number>(0)
-  const [pollCleanup, setPollCleanup] = useState<(() => void) | null>(null)
+  const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedModel, setGeneratedModel] = useState<GeneratedModel | null>(
+    null,
+  );
+  const [error, setError] = useState<string>("");
+  const [taskId, setTaskId] = useState<string>("");
+  const [taskStatus, setTaskStatus] = useState<string>("");
+  const [taskProgress, setTaskProgress] = useState<number>(0);
+  const [pollCleanup, setPollCleanup] = useState<(() => void) | null>(null);
+
+  
   const [parameters, setParameters] = useState<ModelParameters>({
     scale: 1.0,
     detail: 0.5,
-    density: 0.7
-  })
+    density: 0.7,
+  });
 
   // 组件卸载时清理轮询
   useEffect(() => {
     return () => {
       if (pollCleanup) {
-        pollCleanup()
+        pollCleanup();
       }
-    }
-  }, [pollCleanup])
+    };
+  }, [pollCleanup]);
 
   const uploadImageToTripo3D = async (file: File) => {
-    console.log("=== 开始上传图片到 Tripo3D ===")
+    console.log("=== 开始上传图片到 Tripo3D ===");
     console.log("文件信息:", {
       name: file.name,
       size: file.size,
-      type: file.type
-    })
+      type: file.type,
+    });
+
 
     setIsUploading(true)
     setError('')
@@ -85,27 +104,27 @@ export default function GeneratePage() {
     setImagePreview('')
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      const formData = new FormData();
+      formData.append("file", file);
 
-      console.log("准备调用 /api/upload-image")
+      console.log("准备调用 /api/upload-image");
 
-      const response = await fetch('/api/upload-image', {
-        method: 'POST',
+      const response = await fetch("/api/upload-image", {
+        method: "POST",
         body: formData,
-      })
+      });
 
-      console.log("API 响应状态:", response.status)
+      console.log("API 响应状态:", response.status);
 
       if (!response.ok) {
-        throw new Error(`上传失败: ${response.statusText}`)
+        throw new Error(`上传失败: ${response.statusText}`);
       }
 
-      const result = await response.json()
-      console.log("上传结果:", result)
+      const result = await response.json();
+      console.log("上传结果:", result);
 
       if (!result.success) {
-        throw new Error(result.error || '上传失败')
+        throw new Error(result.error || "上传失败");
       }
 
       // 设置图片token和预览
@@ -114,339 +133,356 @@ export default function GeneratePage() {
       console.log("✅ 图片上传成功，获得 token:", result.data.image_token)
       console.log("图片类型:", result.data.image_type)
 
-      setUploadedImage(file)
+      setUploadedImage(file);
 
       // 创建本地预览
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onload = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
-      console.error("上传失败:", err)
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      console.error("上传失败:", err);
+      setError(err instanceof Error ? err.message : "上传失败，请重试");
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
+    const file = acceptedFiles[0];
     if (file) {
-      uploadImageToTripo3D(file)
+      uploadImageToTripo3D(file);
     }
-  }, [])
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      "image/*": [".png", ".jpg", ".jpeg", ".webp"],
     },
-    maxFiles: 1
-  })
+    maxFiles: 1,
+  });
 
   // 轮询任务状态 - 优化版本
   const pollTaskStatus = async (taskId: string) => {
-    console.log("开始轮询任务状态:", taskId)
+    console.log("开始轮询任务状态:", taskId);
 
     // 轮询配置
     const POLL_CONFIG = {
-      maxAttempts: 199,        // 最大轮询次数 (120次 * 3秒 = 6分钟)
-      pollInterval: 3000,      // 轮询间隔 (3秒)
+      maxAttempts: 199, // 最大轮询次数 (120次 * 3秒 = 6分钟)
+      pollInterval: 3000, // 轮询间隔 (3秒)
       errorRetryInterval: 5000, // 错误重试间隔 (5秒)
-      maxErrorRetries: 5,      // 最大错误重试次数
-      stuckTimeout: 180000     // 卡住超时时间 (3分钟)
-    }
+      maxErrorRetries: 5, // 最大错误重试次数
+      stuckTimeout: 180000, // 卡住超时时间 (3分钟)
+    };
 
-    let pollCount = 0
-    let errorCount = 0
-    let lastStatus = ''
-    let lastStatusTime = Date.now()
-    let pollTimeoutId: NodeJS.Timeout | null = null
+    let pollCount = 0;
+    let errorCount = 0;
+    let lastStatus = "";
+    let lastStatusTime = Date.now();
+    let pollTimeoutId: NodeJS.Timeout | null = null;
 
     const poll = async () => {
-      pollCount++
-      console.log(`轮询第 ${pollCount} 次，任务ID: ${taskId}`)
+      pollCount++;
+      console.log(`轮询第 ${pollCount} 次，任务ID: ${taskId}`);
 
       // 检查是否超过最大轮询次数
       if (pollCount > POLL_CONFIG.maxAttempts) {
-        console.log("轮询次数超限，停止轮询")
-        setIsGenerating(false)
-        setError('任务处理超时，请重试或联系客服')
-        return
+        console.log("轮询次数超限，停止轮询");
+        setIsGenerating(false);
+        setError("任务处理超时，请重试或联系客服");
+        return;
       }
 
       try {
-        const response = await fetch(`/api/task-status?taskId=${taskId}`)
+        const response = await fetch(`/api/task-status?taskId=${taskId}`);
 
         if (!response.ok) {
-          throw new Error('获取任务状态失败')
+          throw new Error("获取任务状态失败");
         }
 
-        const result = await response.json()
-        console.log(`任务状态 (第${pollCount}次):`, result)
+        const result = await response.json();
+        console.log(`任务状态 (第${pollCount}次):`, result);
 
         if (result.success) {
-          const { status, progress, model } = result.data
-          const currentTime = Date.now()
+          const { status, progress, model, preview } = result.data;
+          const currentTime = Date.now();
 
-          console.log("=== 轮询状态详情 ===")
-          console.log("状态:", status)
-          console.log("进度:", progress)
-          console.log("模型数据:", model)
-          console.log("完整数据:", JSON.stringify(result.data, null, 2))
+          console.log("=== 轮询状态详情 ===");
+          console.log("状态:", status);
+          console.log("进度:", progress);
+          console.log("模型数据:", model);
+          console.log("预览数据:", preview);
+          console.log("完整数据:", JSON.stringify(result.data, null, 2));
 
           // 检查状态是否发生变化
           if (status !== lastStatus) {
-            lastStatus = status
-            lastStatusTime = currentTime
-            console.log(`🔄 状态变化: ${lastStatus} → ${status}`)
+            lastStatus = status;
+            lastStatusTime = currentTime;
+            console.log(`🔄 状态变化: ${lastStatus} → ${status}`);
           } else {
             // 检查是否在同一状态卡太久
-            const stuckTime = currentTime - lastStatusTime
-            console.log(`⏱️ 在 ${status} 状态已停留 ${Math.round(stuckTime / 1000)} 秒`)
+            const stuckTime = currentTime - lastStatusTime;
+            console.log(
+              `⏱️ 在 ${status} 状态已停留 ${Math.round(stuckTime / 1000)} 秒`,
+            );
 
             if (stuckTime > POLL_CONFIG.stuckTimeout) {
-              console.log(`⚠️ 任务在 ${status} 状态卡住超过 ${POLL_CONFIG.stuckTimeout / 1000} 秒`)
-              setIsGenerating(false)
-              setError(`任务处理异常：在 ${status} 状态停留过久，请重试`)
-              return
+              console.log(
+                `⚠️ 任务在 ${status} 状态卡住超过 ${POLL_CONFIG.stuckTimeout / 1000} 秒`,
+              );
+              setIsGenerating(false);
+              setError(`任务处理异常：在 ${status} 状态停留过久，请重试`);
+              return;
             }
           }
 
-          setTaskStatus(status)
-          setTaskProgress(progress || 0)
+          setTaskStatus(status);
+          setTaskProgress(progress || 0);
 
           // 根据状态更新UI
           switch (status) {
-            case 'queued':
-              console.log(`📋 任务排队中... (${pollCount}/${POLL_CONFIG.maxAttempts})`)
-              break
-            case 'running':
-              console.log(`🔄 任务进行中... ${progress}% (${pollCount}/${POLL_CONFIG.maxAttempts})`)
-              break
-            case 'success':
-              console.log("🎉 任务完成!")
-              console.log("完整模型数据:", model)
-              console.log("模型URL:", model)
-              console.log("预览URL:", null)
+            case "queued":
+              console.log(
+                `📋 任务排队中... (${pollCount}/${POLL_CONFIG.maxAttempts})`,
+              );
+              break;
+            case "running":
+              console.log(
+                `🔄 任务进行中... ${progress}% (${pollCount}/${POLL_CONFIG.maxAttempts})`,
+              );
+              break;
+            case "success":
+              console.log("🎉 任务完成!");
+              console.log("完整模型数据:", model);
+              console.log("模型URL:", model);
+              console.log("预览URL:", preview);
 
-              setIsGenerating(false)
+              setIsGenerating(false);
               // 使用代理URL来避免跨域问题
               const proxyModelUrl = model
                 ? `/api/proxy-model?url=${encodeURIComponent(model)}`
-                : ''
-              // const proxyPreviewUrl = model?.preview_url
-              //   ? `/api/proxy-image?url=${encodeURIComponent(model.preview_url)}`
-              //   : ''
+                : "";
+              const proxyPreviewUrl = preview
+                ? `/api/proxy-image?url=${encodeURIComponent(preview)}`
+                : "";
 
-              console.log("代理模型URL:", proxyModelUrl)
-              // console.log("代理预览URL:", proxyPreviewUrl)
+              console.log("代理模型URL:", proxyModelUrl);
+              console.log("代理预览URL:", proxyPreviewUrl);
 
               setGeneratedModel({
                 id: taskId,
                 file_url: proxyModelUrl,
-                // preview_url: proxyPreviewUrl,
-                status: 'completed',
+                preview_url: proxyPreviewUrl,
+                status: "completed",
                 task_id: taskId,
                 progress: 100,
-                demo: result.demo
-              })
+                demo: result.demo,
+              });
 
-              if (pollTimeoutId) clearTimeout(pollTimeoutId)
-              console.log("✅ 轮询完成，模型已设置")
-              return // 停止轮询
+              if (pollTimeoutId) clearTimeout(pollTimeoutId);
+              console.log("✅ 轮询完成，模型已设置");
+              return; // 停止轮询
 
-            case 'failed':
-            case 'cancelled':
-              console.log(`❌ 任务${status === 'failed' ? '失败' : '被取消'}`)
-              setIsGenerating(false)
-              setError(`任务${status === 'failed' ? '失败' : '被取消'}`)
-              if (pollTimeoutId) clearTimeout(pollTimeoutId)
-              return // 停止轮询
+            case "failed":
+            case "cancelled":
+              console.log(`❌ 任务${status === "failed" ? "失败" : "被取消"}`);
+              setIsGenerating(false);
+              setError(`任务${status === "failed" ? "失败" : "被取消"}`);
+              if (pollTimeoutId) clearTimeout(pollTimeoutId);
+              return; // 停止轮询
 
             default:
-              console.log(`❓ 未知状态: ${status}`)
-              break
+              console.log(`❓ 未知状态: ${status}`);
+              break;
           }
 
           // 重置错误计数
-          errorCount = 0
+          errorCount = 0;
 
           // 如果任务还在进行中，继续轮询
-          if (status === 'queued' || status === 'running') {
-            console.log(`⏰ ${POLL_CONFIG.pollInterval / 1000}秒后继续轮询...`)
-            pollTimeoutId = setTimeout(poll, POLL_CONFIG.pollInterval)
+          if (status === "queued" || status === "running") {
+            console.log(`⏰ ${POLL_CONFIG.pollInterval / 1000}秒后继续轮询...`);
+            pollTimeoutId = setTimeout(poll, POLL_CONFIG.pollInterval);
           } else {
-            console.log(`🛑 任务状态为 ${status}，停止轮询`)
+            console.log(`🛑 任务状态为 ${status}，停止轮询`);
           }
         } else {
-          console.log("❌ API返回失败:", result)
-          throw new Error(result.error || '获取任务状态失败')
+          console.log("❌ API返回失败:", result);
+          throw new Error(result.error || "获取任务状态失败");
         }
-
       } catch (err) {
-        errorCount++
-        console.error(`🚨 轮询任务状态失败 (第${errorCount}/${POLL_CONFIG.maxErrorRetries}次错误):`, err)
+        errorCount++;
+        console.error(
+          `🚨 轮询任务状态失败 (第${errorCount}/${POLL_CONFIG.maxErrorRetries}次错误):`,
+          err,
+        );
 
         // 检查是否超过最大错误重试次数
         if (errorCount > POLL_CONFIG.maxErrorRetries) {
-          console.log("💥 错误重试次数超限，停止轮询")
-          setIsGenerating(false)
-          setError('网络连接异常，请检查网络后重试')
-          return
+          console.log("💥 错误重试次数超限，停止轮询");
+          setIsGenerating(false);
+          setError("网络连接异常，请检查网络后重试");
+          return;
         }
 
         // 错误重试
-        console.log(`🔄 ${POLL_CONFIG.errorRetryInterval / 1000}秒后重试... (剩余重试次数: ${POLL_CONFIG.maxErrorRetries - errorCount})`)
-        pollTimeoutId = setTimeout(poll, POLL_CONFIG.errorRetryInterval)
+        console.log(
+          `🔄 ${POLL_CONFIG.errorRetryInterval / 1000}秒后重试... (剩余重试次数: ${POLL_CONFIG.maxErrorRetries - errorCount})`,
+        );
+        pollTimeoutId = setTimeout(poll, POLL_CONFIG.errorRetryInterval);
       }
-    }
+    };
 
     // 开始轮询
-    poll()
+    poll();
 
     // 返回清理函数，用于取消轮询
     return () => {
       if (pollTimeoutId) {
-        clearTimeout(pollTimeoutId)
-        console.log("轮询已取消")
+        clearTimeout(pollTimeoutId);
+        console.log("轮询已取消");
       }
-    }
-  }
+    };
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim() && !imageToken) {
-      setError('请输入描述文本或上传图片')
-      return
+      setError("请输入描述文本或上传图片");
+      return;
     }
 
     // 如果有正在进行的轮询，先清理
     if (pollCleanup) {
-      pollCleanup()
-      setPollCleanup(null)
+      pollCleanup();
+      setPollCleanup(null);
     }
 
-    setIsGenerating(true)
-    setError('')
-    setGeneratedModel(null)
-    setTaskId('')
-    setTaskStatus('')
-    setTaskProgress(0)
+    setIsGenerating(true);
+    setError("");
+    setGeneratedModel(null);
+    setTaskId("");
+    setTaskStatus("");
+    setTaskProgress(0);
 
     try {
-      const response = await fetch('/api/generate-model', {
-        method: 'POST',
+      const response = await fetch("/api/generate-model", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           prompt: prompt.trim(),
           imageToken: imageToken || null,
-          imageType: imageType || 'jpg'
+          parameters,
+          imageType: imageType 
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error('生成失败，请重试')
+        throw new Error("生成失败，请重试");
       }
 
-      const result = await response.json()
-      console.log("=== 生成API响应 ===")
-      console.log("完整结果:", JSON.stringify(result, null, 2))
-      console.log("result.success:", result.success)
-      console.log("result.data:", result.data)
-      console.log("task_id:", result.data?.task_id)
+      const result = await response.json();
+      console.log("=== 生成API响应 ===");
+      console.log("完整结果:", JSON.stringify(result, null, 2));
+      console.log("result.success:", result.success);
+      console.log("result.data:", result.data);
+      console.log("task_id:", result.data?.task_id);
 
       if (result.success && result.data?.task_id) {
-        const newTaskId = result.data.task_id
-        console.log("✅ 获得任务ID，开始轮询:", newTaskId)
+        const newTaskId = result.data.task_id;
+        console.log("✅ 获得任务ID，开始轮询:", newTaskId);
 
-        setTaskId(newTaskId)
-        setTaskStatus('queued')
+        setTaskId(newTaskId);
+        setTaskStatus("queued");
 
         // 开始轮询任务状态，并保存清理函数
-        const cleanup = pollTaskStatus(newTaskId)
-        setPollCleanup(() => cleanup)
+        const cleanup = pollTaskStatus(newTaskId);
+        setPollCleanup(() => cleanup);
       } else if (result.demo) {
         // 如果是演示模式，直接设置结果
-        console.log("🎭 演示模式，直接设置模型结果")
+        console.log("🎭 演示模式，直接设置模型结果");
         setGeneratedModel({
-          id: result.data?.task_id || 'demo',
-          file_url: 'https://storage.googleapis.com/3d-model-samples/sample.glb',
-          preview_url: 'https://storage.googleapis.com/3d-model-samples/sample-preview.jpg',
-          status: 'completed',
-          demo: true
-        })
-        setIsGenerating(false)
+          id: result.data?.task_id || "demo",
+          file_url:
+            "https://storage.googleapis.com/3d-model-samples/sample.glb",
+          preview_url:
+            "https://storage.googleapis.com/3d-model-samples/sample-preview.jpg",
+          status: "completed",
+          demo: true,
+        });
+        setIsGenerating(false);
       } else {
-        console.log("❌ 未知的响应格式:", result)
-        throw new Error('服务器返回了未知的响应格式')
+        console.log("❌ 未知的响应格式:", result);
+        throw new Error("服务器返回了未知的响应格式");
       }
-
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成失败，请重试')
-      setIsGenerating(false)
+      setError(err instanceof Error ? err.message : "生成失败，请重试");
+      setIsGenerating(false);
     }
-  }
+  };
 
-  const handleParameterChange = (param: keyof ModelParameters, value: number) => {
-    setParameters(prev => ({
+  const handleParameterChange = (
+    param: keyof ModelParameters,
+    value: number,
+  ) => {
+    setParameters((prev) => ({
       ...prev,
-      [param]: value
-    }))
-  }
+      [param]: value,
+    }));
+  };
 
   const handleCancelGeneration = () => {
     if (pollCleanup) {
-      pollCleanup()
-      setPollCleanup(null)
+      pollCleanup();
+      setPollCleanup(null);
     }
-    setIsGenerating(false)
-    setTaskStatus('')
-    setTaskProgress(0)
-    setError('生成已取消')
-    console.log("用户取消了模型生成")
-  }
+    setIsGenerating(false);
+    setTaskStatus("");
+    setTaskProgress(0);
+    setError("生成已取消");
+    console.log("用户取消了模型生成");
+  };
 
   const handleDownloadModel = async () => {
-    if (!generatedModel?.file_url) return
+    if (!generatedModel?.file_url) return;
 
     try {
-      const filename = `model_${generatedModel.id}.glb`
+      const filename = `model_${generatedModel.id}.glb`;
 
       // 如果是代理URL，需要提取原始URL
-      let downloadUrl = generatedModel.file_url
-      if (downloadUrl.startsWith('/api/proxy-model?url=')) {
+      let downloadUrl = generatedModel.file_url;
+      if (downloadUrl.startsWith("/api/proxy-model?url=")) {
         // 从代理URL中提取原始URL
-        const urlParam = downloadUrl.split('url=')[1]
-        const originalUrl = decodeURIComponent(urlParam)
-        downloadUrl = `/api/download-model?url=${encodeURIComponent(originalUrl)}&filename=${filename}`
+        const urlParam = downloadUrl.split("url=")[1];
+        const originalUrl = decodeURIComponent(urlParam);
+        downloadUrl = `/api/download-model?url=${encodeURIComponent(originalUrl)}&filename=${filename}`;
       } else {
-        downloadUrl = `/api/download-model?url=${encodeURIComponent(downloadUrl)}&filename=${filename}`
+        downloadUrl = `/api/download-model?url=${encodeURIComponent(downloadUrl)}&filename=${filename}`;
       }
 
       // 创建下载链接
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-      console.log("开始下载模型:", filename)
+      console.log("开始下载模型:", filename);
     } catch (err) {
-      console.error('下载失败:', err)
-      setError('模型下载失败，请重试')
+      console.error("下载失败:", err);
+      setError("模型下载失败，请重试");
     }
-  }
+  };
 
   const handleOrderPrint = () => {
-    if (!generatedModel) return
+    if (!generatedModel) return;
     // Navigate to order page with model ID
-    window.location.href = `/orders/new?modelId=${generatedModel.id}`
-  }
+    window.location.href = `/orders/new?modelId=${generatedModel.id}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -505,12 +541,13 @@ export default function GeneratePage() {
                   <Label>上传参考图片</Label>
                   <div
                     {...getRootProps()}
-                    className={`mt-2 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isDragActive
-                      ? 'border-blue-500 bg-blue-50'
-                      : isUploading
-                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                        : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                    className={`mt-2 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragActive
+                        ? "border-blue-500 bg-blue-50"
+                        : isUploading
+                          ? "border-gray-300 bg-gray-50 cursor-not-allowed"
+                          : "border-gray-300 hover:border-gray-400"
+                    }`}
                   >
                     <input {...getInputProps()} disabled={isUploading} />
                     {isUploading ? (
@@ -525,9 +562,13 @@ export default function GeneratePage() {
                           alt="Preview"
                           className="max-h-32 mx-auto rounded"
                         />
-                        <p className="text-sm text-gray-600">点击或拖拽更换图片</p>
+                        <p className="text-sm text-gray-600">
+                          点击或拖拽更换图片
+                        </p>
                         {imageToken && (
-                          <p className="text-xs text-green-600">✓ 图片已上传成功</p>
+                          <p className="text-xs text-green-600">
+                            ✓ 图片已上传成功
+                          </p>
                         )}
                       </div>
                     ) : (
@@ -535,7 +576,7 @@ export default function GeneratePage() {
                         <Upload className="h-12 w-12 text-gray-400 mx-auto" />
                         <div>
                           <p className="text-gray-600">
-                            {isDragActive ? '释放文件' : '点击或拖拽图片到此处'}
+                            {isDragActive ? "释放文件" : "点击或拖拽图片到此处"}
                           </p>
                           <p className="text-sm text-gray-500 mt-1">
                             支持 PNG, JPG, JPEG, WebP 格式
@@ -587,16 +628,19 @@ export default function GeneratePage() {
                 )}
 
                 {/* 调试信息面板 - 开发模式下显示 */}
-                {process.env.NODE_ENV === 'development' && (taskId || taskStatus) && (
-                  <div className="bg-gray-100 p-3 rounded-lg text-xs space-y-1">
-                    <div className="font-semibold text-gray-700">调试信息:</div>
-                    {taskId && <div>任务ID: {taskId}</div>}
-                    {taskStatus && <div>状态: {taskStatus}</div>}
-                    {taskProgress > 0 && <div>进度: {taskProgress}%</div>}
-                    <div>生成中: {isGenerating ? '是' : '否'}</div>
-                    <div>图片Token: {imageToken ? '已设置' : '未设置'}</div>
-                  </div>
-                )}
+                {process.env.NODE_ENV === "development" &&
+                  (taskId || taskStatus) && (
+                    <div className="bg-gray-100 p-3 rounded-lg text-xs space-y-1">
+                      <div className="font-semibold text-gray-700">
+                        调试信息:
+                      </div>
+                      {taskId && <div>任务ID: {taskId}</div>}
+                      {taskStatus && <div>状态: {taskStatus}</div>}
+                      {taskProgress > 0 && <div>进度: {taskProgress}%</div>}
+                      <div>生成中: {isGenerating ? "是" : "否"}</div>
+                      <div>图片Token: {imageToken ? "已设置" : "未设置"}</div>
+                    </div>
+                  )}
               </CardContent>
             </Card>
 
@@ -623,7 +667,9 @@ export default function GeneratePage() {
                 <div>
                   <CardTitle>3D预览</CardTitle>
                   <CardDescription>
-                    {generatedModel ? '拖拽旋转查看模型' : '生成完成后将在此显示3D模型'}
+                    {generatedModel
+                      ? "拖拽旋转查看模型"
+                      : "生成完成后将在此显示3D模型"}
                   </CardDescription>
                 </div>
 
@@ -649,7 +695,9 @@ export default function GeneratePage() {
                             <Label>缩放比例: {parameters.scale}x</Label>
                             <Slider
                               value={[parameters.scale]}
-                              onValueChange={([value]) => handleParameterChange('scale', value)}
+                              onValueChange={([value]) =>
+                                handleParameterChange("scale", value)
+                              }
                               min={0.5}
                               max={2.0}
                               step={0.1}
@@ -658,10 +706,14 @@ export default function GeneratePage() {
                           </div>
 
                           <div>
-                            <Label>细节级别: {Math.round(parameters.detail * 100)}%</Label>
+                            <Label>
+                              细节级别: {Math.round(parameters.detail * 100)}%
+                            </Label>
                             <Slider
                               value={[parameters.detail]}
-                              onValueChange={([value]) => handleParameterChange('detail', value)}
+                              onValueChange={([value]) =>
+                                handleParameterChange("detail", value)
+                              }
                               min={0.1}
                               max={1.0}
                               step={0.1}
@@ -670,10 +722,14 @@ export default function GeneratePage() {
                           </div>
 
                           <div>
-                            <Label>网格密度: {Math.round(parameters.density * 100)}%</Label>
+                            <Label>
+                              网格密度: {Math.round(parameters.density * 100)}%
+                            </Label>
                             <Slider
                               value={[parameters.density]}
-                              onValueChange={([value]) => handleParameterChange('density', value)}
+                              onValueChange={([value]) =>
+                                handleParameterChange("density", value)
+                              }
                               min={0.3}
                               max={1.0}
                               step={0.1}
@@ -712,13 +768,18 @@ export default function GeneratePage() {
                         {taskStatus && (
                           <div className="space-y-2">
                             <p className="text-sm">
-                              状态: {
-                                taskStatus === 'queued' ? '排队中' :
-                                  taskStatus === 'running' ? '生成中' :
-                                    taskStatus === 'success' ? '完成' :
-                                      taskStatus === 'failed' ? '失败' :
-                                        taskStatus === 'cancelled' ? '已取消' : taskStatus
-                              }
+                              状态:{" "}
+                              {taskStatus === "queued"
+                                ? "排队中"
+                                : taskStatus === "running"
+                                  ? "生成中"
+                                  : taskStatus === "success"
+                                    ? "完成"
+                                    : taskStatus === "failed"
+                                      ? "失败"
+                                      : taskStatus === "cancelled"
+                                        ? "已取消"
+                                        : taskStatus}
                             </p>
                             {taskProgress > 0 && (
                               <div className="w-full bg-gray-200 rounded-full h-2">
@@ -729,7 +790,9 @@ export default function GeneratePage() {
                               </div>
                             )}
                             <p className="text-xs text-gray-500">
-                              {taskProgress > 0 ? `${taskProgress}%` : '请耐心等待...'}
+                              {taskProgress > 0
+                                ? `${taskProgress}%`
+                                : "请耐心等待..."}
                             </p>
                           </div>
                         )}
@@ -774,5 +837,5 @@ export default function GeneratePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
