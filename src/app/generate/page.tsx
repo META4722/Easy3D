@@ -522,12 +522,12 @@ export default function GeneratePage() {
                   描述你的想法
                 </CardTitle>
                 <CardDescription>
-                  用文字描述或上传图片，AI将为你生成专业的3D模型
+                  上传图片，AI将为你生成专业的3D模型
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div>
+                {/* <div>
                   <Label htmlFor="prompt">文字描述</Label>
                   <Textarea
                     id="prompt"
@@ -537,7 +537,7 @@ export default function GeneratePage() {
                     rows={4}
                     className="mt-2"
                   />
-                </div>
+                </div>  */}
 
                 <div className="text-center text-gray-500">或者</div>
 
