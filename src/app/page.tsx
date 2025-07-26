@@ -30,6 +30,9 @@ export default function LandingPage() {
             <Link href="/generate" className="text-gray-600 hover:text-gray-900">
               AI生成
             </Link>
+            <Link href="/tasks" className="text-gray-600 hover:text-gray-900">
+              任务管理
+            </Link>
             <Link href="/models" className="text-gray-600 hover:text-gray-900">
               我的模型
             </Link>
