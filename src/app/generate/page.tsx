@@ -81,7 +81,7 @@ export default function GeneratePage() {
   // 组件卸载时清理轮询
   useEffect(() => {
     return () => {
-      if (pollCleanup) {
+      if (pollCleanup && typeof pollCleanup === 'function') {
         pollCleanup();
       }
     };
@@ -165,7 +165,7 @@ export default function GeneratePage() {
   });
 
   // 轮询任务状态 - 优化版本
-  const pollTaskStatus = async (taskId: string) => {
+  const pollTaskStatus = (taskId: string) => {
     console.log("开始轮询任务状态:", taskId);
 
     // 轮询配置
@@ -354,9 +354,12 @@ export default function GeneratePage() {
     }
 
     // 如果有正在进行的轮询，先清理
-    if (pollCleanup) {
+    if (pollCleanup && typeof pollCleanup === 'function') {
+      console.log("清理之前的轮询");
       pollCleanup();
       setPollCleanup(null);
+    } else if (pollCleanup) {
+      console.log("pollCleanup 不是函数:", typeof pollCleanup, pollCleanup);
     }
 
     setIsGenerating(true);
@@ -400,7 +403,8 @@ export default function GeneratePage() {
 
         // 开始轮询任务状态，并保存清理函数
         const cleanup = pollTaskStatus(newTaskId);
-        setPollCleanup(() => cleanup);
+        console.log("设置清理函数:", typeof cleanup);
+        setPollCleanup(cleanup);
       } else if (result.demo) {
         // 如果是演示模式，直接设置结果
         console.log("🎭 演示模式，直接设置模型结果");
@@ -435,7 +439,7 @@ export default function GeneratePage() {
   };
 
   const handleCancelGeneration = () => {
-    if (pollCleanup) {
+    if (pollCleanup && typeof pollCleanup === 'function') {
       pollCleanup();
       setPollCleanup(null);
     }
