@@ -61,11 +61,16 @@ export async function POST(request: NextRequest) {
       // 创建预览URL (使用文件的blob URL)
       const previewUrl = URL.createObjectURL(file)
 
+      // 获取文件扩展名来确定类型
+      const fileExtension = file.name.split('.').pop()?.toLowerCase()
+      const imageType = fileExtension
+
       return NextResponse.json({
         success: true,
         data: {
           image_token: tripo3dData.data.image_token,
-          preview_url: previewUrl
+          preview_url: previewUrl,
+          image_type: imageType // 添加图片类型信息
         }
       })
 

@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, imageToken } = await request.json()
+    const { prompt, imageToken, imageType } = await request.json()
 
     if (!prompt && !imageToken) {
       return NextResponse.json(
@@ -12,21 +12,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 临时跳过数据库操作，直接测试 Tripo3D API
+    console.log("=== 接收到的请求参数 ===")
+    console.log("prompt:", prompt)
+    console.log("imageToken:", imageToken)
+    console.log("imageType:", imageType)
+
+    // 检查是否是演示 token
+    if (imageToken && imageToken.startsWith('demo_token_')) {
+      console.log("⚠️ 检测到演示 token，跳过真实 API 调用")
+      return NextResponse.json({
+        success: true,
+        data: {
+          task_id: `demo_task_${Date.now()}`,
+          status: 'processing'
+        },
+        demo: true,
+        message: '演示模式 - 使用演示图片 token'
+      })
+    }
 
     try {
       // 构建请求数据 - 根据是否有 imageToken 决定类型
       const requestData = imageToken ? {
-        // 图片转模型
+        // 图片转模型 - 根据 Tripo3D API 文档格式
         type: 'image_to_model',
         file: {
-          type: 'jpg',
+          type: imageType , // 使用实际的图片类型
           file_token: imageToken
         }
       } : {
         // 文本转模型
         type: 'text_to_model',
         prompt: prompt
+      }
+
+      console.log("=== 发送给 Tripo3D 的请求数据 ===")
+      console.log(JSON.stringify(requestData, null, 2))
+
+      // 验证 API Key
+      if (!process.env.TRIPO3D_API_KEY) {
+        throw new Error('TRIPO3D_API_KEY is not configured')
       }
 
       const tripo3dResponse = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
@@ -38,14 +63,26 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(requestData)
       })
 
+      console.log("=== Tripo3D API 响应状态 ===")
+      console.log("状态码:", tripo3dResponse.status)
+      console.log("状态文本:", tripo3dResponse.statusText)
+
       if (!tripo3dResponse.ok) {
         const errorText = await tripo3dResponse.text()
+        console.error("=== Tripo3D API 错误响应 ===")
+        console.error("错误内容:", errorText)
         throw new Error(`Tripo3D API error! status: ${tripo3dResponse.status}, response: ${errorText}`)
       }
 
       const tripo3dData = await tripo3dResponse.json()
+      console.log("=== Tripo3D API 成功响应 ===")
+      console.log(JSON.stringify(tripo3dData, null, 2))
+
       // 检查 Tripo3D API 响应
       if (tripo3dData.code !== 0) {
+        console.error("=== Tripo3D API 业务错误 ===")
+        console.error("错误代码:", tripo3dData.code)
+        console.error("错误消息:", tripo3dData.message)
         throw new Error(`Tripo3D API error: ${tripo3dData.message || 'Unknown error'}`)
       }
 
