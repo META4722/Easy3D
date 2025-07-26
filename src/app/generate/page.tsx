@@ -634,7 +634,7 @@ export default function GeneratePage() {
                 )}
 
                 {/* 调试信息面板 - 开发模式下显示 */}
-                {process.env.NODE_ENV === "development" &&
+                {/*process.env.NODE_ENV === "development" &&
                   (taskId || taskStatus) && (
                     <div className="bg-gray-100 p-3 rounded-lg text-xs space-y-1">
                       <div className="font-semibold text-gray-700">
@@ -646,7 +646,7 @@ export default function GeneratePage() {
                       <div>生成中: {isGenerating ? "是" : "否"}</div>
                       <div>图片Token: {imageToken ? "已设置" : "未设置"}</div>
                     </div>
-                  )}
+                  )*/}
               </CardContent>
             </Card>
 
