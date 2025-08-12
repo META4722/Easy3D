@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 // 取消任务
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
-    const { taskId } = params
+    const { taskId } = await params
 
     if (!taskId) {
       return NextResponse.json(
@@ -66,10 +66,10 @@ export async function DELETE(
 // 获取单个任务详情
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
-    const { taskId } = params
+    const { taskId } = await params
 
     if (!taskId) {
       return NextResponse.json(
