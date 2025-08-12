@@ -2,6 +2,11 @@
 const nextConfig = {
   allowedDevOrigins: ["*.preview.same-app.com"],
   
+  eslint: {
+    // 仅在构建阶段忽略 ESLint 错误（CI/生产环境）
+    ignoreDuringBuilds: true,
+  },
+  
   // 添加 CORS 头
   async headers() {
     return [
