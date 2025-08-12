@@ -17,27 +17,15 @@ export async function POST(request: NextRequest) {
     console.log("imageToken:", imageToken)
     console.log("imageType:", imageType)
 
-    // 检查是否是演示 token
-    if (imageToken && imageToken.startsWith('demo_token_')) {
-      console.log("⚠️ 检测到演示 token，跳过真实 API 调用")
-      return NextResponse.json({
-        success: true,
-        data: {
-          task_id: `demo_task_${Date.now()}`,
-          status: 'processing'
-        },
-        demo: true,
-        message: '演示模式 - 使用演示图片 token'
-      })
-    }
+
 
     try {
-      // 构建请求数据 - 根据是否有 imageToken 决定类型
+      // 构建请求数据 - 根据 Tripo3D API 文档格式
       const requestData = imageToken ? {
-        // 图片转模型 - 根据 Tripo3D API 文档格式
+        // 图片转模型
         type: 'image_to_model',
         file: {
-          type: imageType , // 使用实际的图片类型
+          type: imageType || 'jpg', // 使用动态图片类型，默认为 jpg
           file_token: imageToken
         }
       } : {
@@ -96,16 +84,14 @@ export async function POST(request: NextRequest) {
     } catch (apiError) {
       console.error('Tripo3D API 调用失败:', apiError)
       
-      // 返回演示响应
-      return NextResponse.json({
-        success: true,
-        data: {
-          task_id: `demo_task_${Date.now()}`,
-          status: 'processing'
+      // 返回真实的错误信息
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Tripo3D API 调用失败: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`
         },
-        demo: true,
-        message: '演示模式 - Tripo3D API 调用失败，返回模拟数据'
-      })
+        { status: 500 }
+      )
     }
 
   } catch (error) {

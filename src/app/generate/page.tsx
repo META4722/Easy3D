@@ -71,7 +71,7 @@ export default function GeneratePage() {
   const [taskProgress, setTaskProgress] = useState<number>(0);
   const [pollCleanup, setPollCleanup] = useState<(() => void) | null>(null);
 
-  
+
   const [parameters, setParameters] = useState<ModelParameters>({
     scale: 1.0,
     detail: 0.5,
@@ -129,7 +129,7 @@ export default function GeneratePage() {
 
       // 设置图片token和预览
       setImageToken(result.data.image_token)
-      setImageType(result.data.image_type )
+      setImageType(result.data.image_type)
       console.log("✅ 图片上传成功，获得 token:", result.data.image_token)
       console.log("图片类型:", result.data.image_type)
 
@@ -379,7 +379,7 @@ export default function GeneratePage() {
           prompt: prompt.trim(),
           imageToken: imageToken || null,
           parameters,
-          imageType: imageType 
+          imageType: imageType
         }),
       });
 
@@ -541,19 +541,18 @@ export default function GeneratePage() {
                 <div className="text-center text-gray-500">或者</div> 
                 */}
 
-                
+
 
                 <div>
                   <Label>上传参考图片</Label>
                   <div
                     {...getRootProps()}
-                    className={`mt-2 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                      isDragActive
-                        ? "border-blue-500 bg-blue-50"
-                        : isUploading
-                          ? "border-gray-300 bg-gray-50 cursor-not-allowed"
-                          : "border-gray-300 hover:border-gray-400"
-                    }`}
+                    className={`mt-2 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isDragActive
+                      ? "border-blue-500 bg-blue-50"
+                      : isUploading
+                        ? "border-gray-300 bg-gray-50 cursor-not-allowed"
+                        : "border-gray-300 hover:border-gray-400"
+                      }`}
                   >
                     <input {...getInputProps()} disabled={isUploading} />
                     {isUploading ? (
