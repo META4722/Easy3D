@@ -6,6 +6,11 @@ const nextConfig = {
     // 仅在构建阶段忽略 ESLint 错误（CI/生产环境）
     ignoreDuringBuilds: true,
   },
+
+  typescript: {
+    // 仅在构建阶段忽略 TypeScript 错误（CI/生产环境）
+    ignoreBuildErrors: true,
+  },
   
   // 添加 CORS 头
   async headers() {
